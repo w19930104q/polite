@@ -1,7 +1,6 @@
 
 extract_domain <- function(url){
-  url_parsed <- httr::parse_url(url)
-  paste0(url_parsed$scheme, "://", url_parsed$hostname)
+  url_host_key(url)
 }
 
 

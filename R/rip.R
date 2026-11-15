@@ -34,7 +34,10 @@ rip <- function(bow, destfile=NULL, ..., mode="wb", path=tempdir(), overwrite=FA
     return(destfilepath)
     }
 
-  download_file_ltd(url, destfilepath, mode=mode, ...)
+  # download through the rate limiter belonging to this host
+  domain <- bow$domain %otherwise% url_host_key(url)
+  st <- polite_host(domain)
+  st$rip(url, destfilepath, mode=mode, ...)
 
   return(destfilepath)
 }

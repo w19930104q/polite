@@ -24,7 +24,7 @@ nod <- function(bow, path, verbose=FALSE){
   # if user supplied URL instead of path
   if(grepl("://|www\\.", path)){
     url_parsed <- httr::parse_url(path)
-    url_subdomain <- paste0(url_parsed$scheme, "://", url_parsed$hostname)
+    url_subdomain <- url_host_key(path)
     if(url_subdomain!=bow$domain)
       bow <- bow(url = path, user_agent = bow$user_agent, delay=bow$delay, times=bow$times,
                  force=FALSE, verbose=verbose, bow$config)

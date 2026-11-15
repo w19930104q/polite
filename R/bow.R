@@ -39,10 +39,12 @@ bow <- function(url,
   stopifnot("Single URL should be provided. Please provide character vector of length 1"=(length(url) == 1)) # write meaningful error ref Lionel talk
   stopifnot("Number of times to attempt scraping should be numeric"=is.numeric(times))
   stopifnot("Number of times to attempt scraping should be positive"=(times>0))
-  if(force) memoise::forget(scrape)
+  if(force){
+    memoise::forget(scrape)
+    polite_forget()
+  }
 
-  url_parsed <- httr::parse_url(url)
-  url_subdomain <- paste0(url_parsed$scheme, "://", url_parsed$hostname)
+  url_subdomain <- url_host_key(url)
   rt <- robotstxt::robotstxt(domain = url_subdomain,
                             user_agent = user_agent,
                             warn = verbose, force = force)
@@ -80,14 +82,9 @@ bow <- function(url,
     warning("This is a little too fast. Are you sure you want to risk being banned?", call. = FALSE)
     }
 
-  # set new rate limits
-  if(self$delay != ratelimitr::get_rates(httr_get_ltd)[[1]]["period"]){
-    set_scrape_delay(self$delay)
-  }
-
-  if(self$delay != ratelimitr::get_rates(download_file_ltd)[[1]]["period"]){
-    set_rip_delay(self$delay)
-  }
+  # register (or merge with) the rate limit for this particular host.
+  # Other hosts keep their own throttles and are not affected.
+  self$delay <- merge_host_delay(self$domain, self$delay)
 
   self
 }
@@ -98,7 +95,9 @@ bow <- function(url,
 #' @param delay Delay between subsequent requests. Default for package is 5 sec.
 #' It can be set lower only under the condition of specifying a custom user-agent string.
 #'
-#' @return Updates rate-limit property of `scrape` and `rip` functions, respectively.
+#' @return Updates the default rate limit as well as the rate limits of all
+#' hosts introduced so far (per-host throttles are otherwise managed
+#' automatically by `bow()`).
 #'
 #' @examples
 #' \donttest{
@@ -113,6 +112,12 @@ bow <- function(url,
 #' @export
 set_scrape_delay <- function(delay){
   ratelimitr::UPDATE_RATE(httr_get_ltd,ratelimitr::rate(n=1, period = delay))
+  for(nm in ls(.polite_hosts, all.names = TRUE)){
+    st <- .polite_hosts[[nm]]
+    ratelimitr::UPDATE_RATE(st$get, ratelimitr::rate(n=1, period = delay))
+    st$delay <- delay
+  }
+  invisible(delay)
 }
 
 #' @rdname set_delay
@@ -120,6 +125,11 @@ set_scrape_delay <- function(delay){
 #' @export
 set_rip_delay <- function(delay){
   ratelimitr::UPDATE_RATE(download_file_ltd,ratelimitr::rate(n=1, period = delay))
+  for(nm in ls(.polite_hosts, all.names = TRUE)){
+    st <- .polite_hosts[[nm]]
+    ratelimitr::UPDATE_RATE(st$rip, ratelimitr::rate(n=1, period = delay))
+  }
+  invisible(delay)
 }
 
 #' Print host introduction object
